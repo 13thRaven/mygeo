@@ -25,6 +25,7 @@
     "steam",
     "discord",
     "ru-blocked",
+    "google-gemini",
     "google"
   ],
   "geoip": [
