@@ -1,0 +1,44 @@
+name: Update Filtered Geo Files
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download source geo files
+        run: |
+          mkdir -p tmp_src dist
+          curl -fsSL "https://raw.githubusercontent.com/runetfreedom/russia-blocked-geosite/release/geosite.dat" -o tmp_src/geosite.dat
+          curl -fsSL "https://raw.githubusercontent.com/runetfreedom/russia-blocked-geoip/release/geoip.dat" -o tmp_src/geoip.dat
+
+      - name: Filter categories
+        run: |
+          python3 scripts/filter_dat.py categories.json tmp_src dist
+
+      - name: Generate SHA256 checksums
+        working-directory: dist
+        run: |
+          sha256sum geosite.dat > geosite.dat.sha256sum
+          sha256sum geoip.dat > geoip.dat.sha256sum
+
+      - name: Publish to orphan release branch
+        working-directory: dist
+        run: |
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b release
+          git add geosite.dat geosite.dat.sha256sum geoip.dat geoip.dat.sha256sum
+          git commit -m "Update geo files ($(date -u +'%Y-%m-%d %H:%M UTC'))"
+          git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          git push --force origin release
