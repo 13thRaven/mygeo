@@ -1,0 +1,38 @@
+{
+  "geosite": [
+    "private",
+    "category-ads",
+    "category-ads-and-telemetry",
+    "epicgames",
+    "category-ai-ru",
+    "category-bank-ru",
+    "category-ecommerce-ru",
+    "category-entertainment-ru",
+    "category-gov-ru",
+    "category-media-ru",
+    "category-retail-ru",
+    "mailru-group",
+    "ru-available-only-inside",
+    "mihoyo",
+    "anthropic",
+    "activision-blizzard",
+    "refilter",
+    "openai",
+    "perplexity",
+    "x",
+    "xai",
+    "epicgames",
+    "steam",
+    "discord",
+    "ru-blocked",
+    "google"
+  ],
+  "geoip": [
+    "yandex",
+    "ru-blocked-community",
+    "private",
+    "ru",
+    "telegram",
+    "re-filter"
+  ]
+}
