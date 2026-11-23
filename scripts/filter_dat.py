@@ -153,14 +153,34 @@ def extract_cidrs_from_entry(entry_chunk: bytes) -> set[tuple[bytes, int]]:
     return cidrs
 
 
-def build_geoip_entry(code: str, cidrs: set[tuple[bytes, int]]) -> bytes:
+def collapse_ipv4_cidrs(cidrs: set[tuple[bytes, int]]) -> list[tuple[bytes, int]]:
+    v4_nets: list[ipaddress.IPv4Network] = []
+    v6_cidrs: list[tuple[bytes, int]] = []
+
+    for ip_bytes, prefix in cidrs:
+        if len(ip_bytes) == 4:
+            v4_nets.append(
+                ipaddress.IPv4Network((ipaddress.IPv4Address(ip_bytes), prefix), strict=False)
+            )
+        elif len(ip_bytes) == 16:
+            v6_cidrs.append((ip_bytes, prefix))
+
+    collapsed_v4 = [
+        (net.network_address.packed, net.prefixlen)
+        for net in ipaddress.collapse_addresses(v4_nets)
+    ]
+    v6_cidrs.sort()
+    return collapsed_v4 + v6_cidrs
+
+
+def build_geoip_entry(code: str, cidrs: list[tuple[bytes, int]]) -> bytes:
     if not cidrs:
         raise RuntimeError(f"Категория {code} не содержит валидных IP/CIDR")
 
     code_bytes = code.upper().encode("utf-8")
     geoip_parts = [b"\x0a" + encode_varint(len(code_bytes)) + code_bytes]
 
-    for ip_bytes, prefix in sorted(cidrs, key=lambda x: (len(x[0]), x[0], x[1])):
+    for ip_bytes, prefix in cidrs:
         cidr_msg = b"\x0a" + encode_varint(len(ip_bytes)) + ip_bytes
         if prefix:
             cidr_msg += b"\x10" + encode_varint(prefix)
@@ -224,23 +244,34 @@ def main() -> None:
 
     # 2. GeoIP (runetfreedom + только IPv4 из 123jjck/cdn-ip-ranges)
     geoip_allowed = {c.strip().upper() for c in config.get("geoip", []) if c.strip()}
-    geoip_entries = extract_entries(src_dir / "geoip.dat", geoip_allowed)
+    raw_geoip_entries = extract_entries(src_dir / "geoip.dat", geoip_allowed)
+
+    geoip_cidrs: dict[str, set[tuple[bytes, int]]] = {
+        code: extract_cidrs_from_entry(chunk) for code, chunk in raw_geoip_entries.items()
+    }
 
     cdn_lists = [c.strip() for c in config.get("cdn_ip_ranges", []) if c.strip()]
     for name in cdn_lists:
         code = name.upper()
         cdn_cidrs = fetch_cdn_ipv4(name)
-        if code in geoip_entries:
-            existing_cidrs = extract_cidrs_from_entry(geoip_entries[code])
-            merged = existing_cidrs | cdn_cidrs
-            geoip_entries[code] = build_geoip_entry(code, merged)
+        if code in geoip_cidrs:
+            before = len(geoip_cidrs[code])
+            geoip_cidrs[code] |= cdn_cidrs
             print(
                 f"[cdn-ip-ranges] Категория '{name}' объединена с geoip.dat "
-                f"({len(existing_cidrs)} + {len(cdn_cidrs)} -> {len(merged)} подсетей)"
+                f"({before} + {len(cdn_cidrs)} -> {len(geoip_cidrs[code])} до агрегации)"
             )
         else:
-            geoip_entries[code] = build_geoip_entry(code, cdn_cidrs)
-            print(f"[cdn-ip-ranges] Добавлена категория '{name}' ({len(cdn_cidrs)} IPv4-подсетей)")
+            geoip_cidrs[code] = cdn_cidrs
+            print(f"[cdn-ip-ranges] Загружена категория '{name}' ({len(cdn_cidrs)} IPv4-подсетей)")
+
+    # 3. Агрегация IPv4-подсетей и сборка итогового geoip.dat
+    geoip_entries: dict[str, bytes] = {}
+    for code in sorted(geoip_cidrs.keys()):
+        raw_set = geoip_cidrs[code]
+        collapsed = collapse_ipv4_cidrs(raw_set)
+        geoip_entries[code] = build_geoip_entry(code, collapsed)
+        print(f"[geoip:{code.lower()}] Агрегация: {len(raw_set)} -> {len(collapsed)} подсетей")
 
     write_dat_and_index(out_dir, "geoip", geoip_entries)
 
