@@ -340,7 +340,7 @@ def write_dat_and_index(out_dir: Path, kind: str, entries: dict[str, bytes]) -> 
     # Склеиваем байты всех выбранных категорий в один файл
     dat_path.write_bytes(b"".join(entries[c] for c in ordered_codes))
     # Сохраняем список категорий в нижнем регистре (по одной на строку)
-    txt_path.write_text("\n".join(c.lower() for c in ordered_codes) + "\n", encoding="utf-8")
+    txt_path.write_text("\n".join(f"{kind}:{c.lower()}" for c in ordered_codes) + "\n", encoding="utf-8")
 
     print(
         f"[{kind}.dat] Категорий: {len(ordered_codes)}, "
