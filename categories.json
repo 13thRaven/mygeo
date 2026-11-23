@@ -34,5 +34,8 @@
     "ru",
     "telegram",
     "re-filter"
-  ]
+  ],
+  "cdn_ip_ranges": [
+    "discord-voice",
+    "telegram"
 }
