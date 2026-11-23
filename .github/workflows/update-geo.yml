@@ -21,7 +21,7 @@ jobs:
           curl -fsSL "https://raw.githubusercontent.com/runetfreedom/russia-blocked-geosite/release/geosite.dat" -o tmp_src/geosite.dat
           curl -fsSL "https://raw.githubusercontent.com/runetfreedom/russia-blocked-geoip/release/geoip.dat" -o tmp_src/geoip.dat
 
-      - name: Filter categories
+      - name: Filter and merge categories
         run: |
           python3 scripts/filter_dat.py categories.json tmp_src dist
 
@@ -31,6 +31,19 @@ jobs:
           sha256sum geosite.dat > geosite.dat.sha256sum
           sha256sum geoip.dat > geoip.dat.sha256sum
 
+      - name: Publish to GitHub Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="latest"
+          DATE_STR=$(date -u +'%Y-%m-%d %H:%M UTC')
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.dat dist/*.sha256sum dist/*.txt --clobber
+            gh release edit "$TAG" --notes "Обновлено: $DATE_STR"
+          else
+            gh release create "$TAG" dist/*.dat dist/*.sha256sum dist/*.txt --title "Geo Files (Latest)" --notes "Обновлено: $DATE_STR"
+          fi
+
       - name: Publish to orphan release branch
         working-directory: dist
         run: |
@@ -38,7 +51,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b release
-          git add geosite.dat geosite.dat.sha256sum geoip.dat geoip.dat.sha256sum
+          git add *.dat *.sha256sum *.txt
           git commit -m "Update geo files ($(date -u +'%Y-%m-%d %H:%M UTC'))"
           git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
           git push --force origin release
