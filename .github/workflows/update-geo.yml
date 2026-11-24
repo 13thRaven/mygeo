@@ -2,8 +2,11 @@ name: Update Filtered Geo Files
 
 on:
   schedule:
-    - cron: "0 3 * * *"
+    - cron: "27 22 * * *"
   workflow_dispatch:
+  push:
+    paths:
+      - "categories.json"
 
 permissions:
   contents: write
