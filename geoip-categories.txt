@@ -1,0 +1,7 @@
+geoip:discord-voice
+geoip:private
+geoip:re-filter
+geoip:ru
+geoip:ru-blocked-community
+geoip:telegram
+geoip:yandex
